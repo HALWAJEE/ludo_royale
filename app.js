@@ -1,253 +1,278 @@
-const $ = (id) => document.getElementById(id);
-const boardEl = $("board");
-const playersEl = $("players");
-const statusEl = $("status");
-const rollBtn = $("roll");
-const startBtn = $("start");
-const dieBtn = $("dice");
-const modal = $("modal");
-const modalError = $("modalError");
-const roomCodeEl = $("roomCode");
-const turnBadge = $("turnBadge");
+const canvas = document.getElementById('ludoCanvas');
+const ctx = canvas.getContext('2d');
+const rollBtn = document.getElementById('roll-btn');
+const diceDisplay = document.getElementById('dice-display');
+const turnText = document.getElementById('current-player-name');
+const messageBox = document.getElementById('message');
+const resetBtn = document.getElementById('reset-btn');
 
-const COLORS = ["red", "green", "yellow", "blue"];
-const COLOR_HEX = { red: "#ef2028", green: "#08b83a", yellow: "#ffe000", blue: "#12a9e8" };
-const DIE = ["", "⚀", "⚁", "⚂", "⚃", "⚄", "⚅"];
+const BOARD_SIZE = 15;
+const TILE_SIZE = canvas.width / BOARD_SIZE;
 
-// 15x15 standard-style Ludo board. 52 shared-track squares, then a 5-square
-// colour-specific home lane and the centre finish.
-const TRACK = [
-  [6,1],[6,2],[6,3],[6,4],[6,5],[5,6],[4,6],[3,6],[2,6],[1,6],[0,6],[0,7],[0,8],
-  [1,8],[2,8],[3,8],[4,8],[5,8],[6,9],[6,10],[6,11],[6,12],[6,13],[6,14],[7,14],
-  [8,14],[8,13],[8,12],[8,11],[8,10],[8,9],[9,8],[10,8],[11,8],[12,8],[13,8],[14,8],
-  [14,7],[14,6],[13,6],[12,6],[11,6],[10,6],[9,6],[8,5],[8,4],[8,3],[8,2],[8,1],[8,0],[7,0],[7,1]
+const PLAYERS = [
+  { id: 0, name: 'Red', color: '#ff3d00', homeX: 1, homeY: 1, startTile: 0, endTile: 50 },
+  { id: 1, name: 'Green', color: '#00e676', homeX: 9, homeY: 1, startTile: 13, endTile: 11 },
+  { id: 2, name: 'Yellow', color: '#ffd600', homeX: 9, homeY: 9, startTile: 26, endTile: 24 },
+  { id: 3, name: 'Blue', color: '#2979ff', homeX: 1, homeY: 9, startTile: 39, endTile: 37 }
 ];
 
-const UNIQUE_TRACK = TRACK;
+const MAIN_PATH = [
+  { x: 1, y: 6 }, { x: 2, y: 6 }, { x: 3, y: 6 }, { x: 4, y: 6 }, { x: 5, y: 6 },
+  { x: 6, y: 5 }, { x: 6, y: 4 }, { x: 6, y: 3 }, { x: 6, y: 2 }, { x: 6, y: 1 }, { x: 6, y: 0 },
+  { x: 7, y: 0 }, { x: 8, y: 0 },
+  { x: 8, y: 1 }, { x: 8, y: 2 }, { x: 8, y: 3 }, { x: 8, y: 4 }, { x: 8, y: 5 },
+  { x: 9, y: 6 }, { x: 10, y: 6 }, { x: 11, y: 6 }, { x: 12, y: 6 }, { x: 13, y: 6 }, { x: 14, y: 6 },
+  { x: 14, y: 7 }, { x: 14, y: 8 },
+  { x: 13, y: 8 }, { x: 12, y: 8 }, { x: 11, y: 8 }, { x: 10, y: 8 }, { x: 9, y: 8 },
+  { x: 8, y: 9 }, { x: 8, y: 10 }, { x: 8, y: 11 }, { x: 8, y: 12 }, { x: 8, y: 13 }, { x: 8, y: 14 },
+  { x: 7, y: 14 }, { x: 6, y: 14 },
+  { x: 6, y: 13 }, { x: 6, y: 12 }, { x: 6, y: 11 }, { x: 6, y: 10 }, { x: 6, y: 9 },
+  { x: 5, y: 8 }, { x: 4, y: 8 }, { x: 3, y: 8 }, { x: 2, y: 8 }, { x: 1, y: 8 }, { x: 0, y: 8 },
+  { x: 0, y: 7 }, { x: 0, y: 6 }
+];
 
-const START = { red: 0, green: 13, yellow: 26, blue: 39 };
-const HOME_LANE = {
-  red: [[7,2],[7,3],[7,4],[7,5],[7,6]],
-  green: [[6,7],[5,7],[4,7],[3,7],[2,7]],
-  yellow: [[7,12],[7,11],[7,10],[7,9],[7,8]],
-  blue: [[8,7],[9,7],[10,7],[11,7],[12,7]]
-};
-const YARD = {
-  red: [[2.05,2.05],[3.95,2.05],[2.05,3.95],[3.95,3.95]],
-  green: [[11.05,2.05],[12.95,2.05],[11.05,3.95],[12.95,3.95]],
-  yellow: [[11.05,11.05],[12.95,11.05],[11.05,12.95],[12.95,12.95]],
-  blue: [[2.05,11.05],[3.95,11.05],[2.05,12.95],[3.95,12.95]]
-};
-const SAFE = new Set([0,8,13,21,26,34,39,47]);
+const SAFE_TILES = [0, 8, 13, 21, 26, 34, 39, 47];
 
-let state = null;
-let selfId = null;
-let rolled = null;
-let diceTimer = null;
+let currentTurn = 0;
+let diceValue = null;
+let hasRolled = false;
+let tokens = [];
 
-const socket = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}`);
-
-function send(message) {
-  if (socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify(message));
-}
-function esc(s) {
-  return String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));
-}
-function svg(tag, attrs = {}) {
-  const e = document.createElementNS("http://www.w3.org/2000/svg", tag);
-  for (const [k,v] of Object.entries(attrs)) e.setAttribute(k, v);
-  return e;
+function initTokens() {
+  tokens = [];
+  PLAYERS.forEach(player => {
+    for (let i = 0; i < 4; i++) {
+      tokens.push({
+        playerId: player.id,
+        id: i,
+        step: -1, // -1 = base, 0..50 = main path, 51..55 = victory road, 56 = finished
+        baseOffset: i
+      });
+    }
+  });
 }
 
 function drawBoard() {
-  boardEl.innerHTML = "";
-  const s = svg("svg", { viewBox: "0 0 900 900", role: "img", "aria-label": "Interactive Ludo board" });
-  const unit = 60;
-  s.appendChild(svg("rect", { x:0, y:0, width:900, height:900, fill:"#fff" }));
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-  const quadrants = {
-    red: [0,0], green:[9,0], yellow:[9,9], blue:[0,9]
-  };
-  const inner = { red:[1,1], green:[10,1], yellow:[10,10], blue:[1,10] };
-
-  for (const color of COLORS) {
-    const [x,y] = quadrants[color];
-    const [ix,iy] = inner[color];
-    s.appendChild(svg("rect", { x:x*unit, y:y*unit, width:360, height:360, fill:COLOR_HEX[color] }));
-    s.appendChild(svg("rect", { x:ix*unit, y:iy*unit, width:240, height:240, rx:4, fill:"#fff", stroke:"#222", "stroke-width":3 }));
-    for (const [gx,gy] of YARD[color]) {
-      s.appendChild(svg("circle", { cx:gx*unit, cy:gy*unit, r:31, fill:COLOR_HEX[color], stroke:"#222", "stroke-width":2 }));
-      s.appendChild(svg("circle", { cx:gx*unit, cy:gy*unit-4, r:7, fill:"#fff", opacity:.3 }));
+  // Background Grid
+  ctx.strokeStyle = '#e0e0e0';
+  ctx.lineWidth = 1;
+  for (let i = 0; i < BOARD_SIZE; i++) {
+    for (let j = 0; j < BOARD_SIZE; j++) {
+      ctx.strokeRect(i * TILE_SIZE, j * TILE_SIZE, TILE_SIZE, TILE_SIZE);
     }
   }
 
-  const inCross = (r,c) => (r >= 6 && r <= 8) || (c >= 6 && c <= 8);
-  for (let r=0;r<15;r++) for (let c=0;c<15;c++) {
-    if (!inCross(r,c)) continue;
-    s.appendChild(svg("rect", { x:c*unit, y:r*unit, width:unit, height:unit, fill:"#fff", stroke:"#777", "stroke-width":1.5 }));
+  // Home Bases
+  drawBase(0, 0, '#ff3d00');
+  drawBase(9, 0, '#00e676');
+  drawBase(9, 9, '#ffd600');
+  drawBase(0, 9, '#2979ff');
+
+  // Victory Center
+  ctx.fillStyle = '#f4f4f4';
+  ctx.fillRect(6 * TILE_SIZE, 6 * TILE_SIZE, 3 * TILE_SIZE, 3 * TILE_SIZE);
+
+  // Home Stretch Paths
+  for (let i = 1; i <= 5; i++) {
+    drawTile(i, 7, '#ff3d00');
+    drawTile(7, i, '#00e676');
+    drawTile(14 - i, 7, '#ffd600');
+    drawTile(7, 14 - i, '#2979ff');
   }
 
-  // Coloured home lanes, centred in the three-square-wide arms.
-  for (const color of COLORS) {
-    for (const [r,c] of HOME_LANE[color]) {
-      s.appendChild(svg("rect", { x:c*unit, y:r*unit, width:unit, height:unit, fill:COLOR_HEX[color], stroke:"#777", "stroke-width":1.5 }));
-    }
-  }
+  // Safe Tile Marks
+  SAFE_TILES.forEach(idx => {
+    const tile = MAIN_PATH[idx];
+    ctx.fillStyle = '#b0bec5';
+    ctx.beginPath();
+    ctx.arc((tile.x + 0.5) * TILE_SIZE, (tile.y + 0.5) * TILE_SIZE, TILE_SIZE * 0.25, 0, Math.PI * 2);
+    ctx.fill();
+  });
 
-  // Colour the four starting squares.
-  for (const color of COLORS) {
-    const [r,c] = UNIQUE_TRACK[START[color]];
-    s.appendChild(svg("rect", { x:c*unit, y:r*unit, width:unit, height:unit, fill:COLOR_HEX[color], stroke:"#555", "stroke-width":2 }));
-  }
-
-  // Subtle safe-square markers.
-  for (const idx of SAFE) {
-    const [r,c] = UNIQUE_TRACK[idx];
-    const g = svg("g", { transform:`translate(${c*unit+30} ${r*unit+30})`, opacity:.6 });
-    g.appendChild(svg("circle", { cx:0, cy:0, r:10, fill:"none", stroke:"#222", "stroke-width":2 }));
-    g.appendChild(svg("path", { d:"M0 -6 L1.8 -1.8 L6 0 L1.8 1.8 L0 6 L-1.8 1.8 L-6 0 L-1.8 -1.8 Z", fill:"#222" }));
-    s.appendChild(g);
-  }
-
-  // Centre finish triangle.
-  const cx=450, cy=450;
-  const tri = {
-    red:`${cx},${cy} ${360},${360} ${360},${540}`,
-    green:`${cx},${cy} ${360},${360} ${540},${360}`,
-    yellow:`${cx},${cy} ${540},${360} ${540},${540}`,
-    blue:`${cx},${cy} ${360},${540} ${540},${540}`
-  };
-  for (const color of COLORS) s.appendChild(svg("polygon", { points:tri[color], fill:COLOR_HEX[color], stroke:"#444", "stroke-width":2 }));
-
-  const tokens = svg("g", { id:"tokens" });
-  s.appendChild(tokens);
-  boardEl.appendChild(s);
+  // Tokens
+  tokens.forEach(token => {
+    const pos = getTokenCanvasPos(token);
+    drawToken(pos.x, pos.y, PLAYERS[token.playerId].color, token.step === 56);
+  });
 }
 
+function drawBase(gx, gy, color) {
+  ctx.fillStyle = color;
+  ctx.fillRect(gx * TILE_SIZE, gy * TILE_SIZE, 6 * TILE_SIZE, 6 * TILE_SIZE);
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect((gx + 1) * TILE_SIZE, (gy + 1) * TILE_SIZE, 4 * TILE_SIZE, 4 * TILE_SIZE);
+}
+
+function drawTile(gx, gy, color) {
+  ctx.fillStyle = color;
+  ctx.fillRect(gx * TILE_SIZE, gy * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+  ctx.strokeRect(gx * TILE_SIZE, gy * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+}
+
+function getTokenCanvasPos(token) {
+  const p = PLAYERS[token.playerId];
+
+  if (token.step === -1) {
+    const offsets = [
+      { dx: 1.8, dy: 1.8 },
+      { dx: 3.2, dy: 1.8 },
+      { dx: 1.8, dy: 3.2 },
+      { dx: 3.2, dy: 3.2 }
+    ];
+    const off = offsets[token.baseOffset];
+    return { x: (p.homeX + off.dx) * TILE_SIZE, y: (p.homeY + off.dy) * TILE_SIZE };
+  }
+
+  if (token.step >= 0 && token.step <= 50) {
+    const globalIdx = (p.startTile + token.step) % 52;
+    const tile = MAIN_PATH[globalIdx];
+    return { x: (tile.x + 0.5) * TILE_SIZE, y: (tile.y + 0.5) * TILE_SIZE };
+  }
+
+  if (token.step >= 51 && token.step <= 55) {
+    const homeIdx = token.step - 50;
+    let gx = 7, gy = 7;
+    if (token.playerId === 0) { gx = homeIdx; gy = 7; }
+    if (token.playerId === 1) { gx = 7; gy = homeIdx; }
+    if (token.playerId === 2) { gx = 14 - homeIdx; gy = 7; }
+    if (token.playerId === 3) { gx = 7; gy = 14 - homeIdx; }
+    return { x: (gx + 0.5) * TILE_SIZE, y: (gy + 0.5) * TILE_SIZE };
+  }
+
+  return { x: 7.5 * TILE_SIZE, y: 7.5 * TILE_SIZE };
+}
+
+function drawToken(x, y, color, isDone) {
+  ctx.beginPath();
+  ctx.arc(x, y, TILE_SIZE * 0.35, 0, Math.PI * 2);
+  ctx.fillStyle = isDone ? '#777' : color;
+  ctx.fill();
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = '#ffffff';
+  ctx.stroke();
+}
+
+rollBtn.addEventListener('click', () => {
+  if (hasRolled) return;
+  diceValue = Math.floor(Math.random() * 6) + 1;
+  diceDisplay.textContent = diceValue;
+  hasRolled = true;
+  rollBtn.disabled = true;
+
+  const validMoves = getMovableTokens(currentTurn, diceValue);
+  if (validMoves.length === 0) {
+    messageBox.textContent = `No moves available for ${PLAYERS[currentTurn].name}. Passing turn...`;
+    setTimeout(nextTurn, 1000);
+  } else if (validMoves.length === 1) {
+    moveToken(validMoves[0]);
+  } else {
+    messageBox.textContent = `Select a token to move ${diceValue} steps.`;
+  }
+});
+
+function getMovableTokens(playerId, roll) {
+  return tokens.filter(t => {
+    if (t.playerId !== playerId) return false;
+    if (t.step === 56) return false;
+    if (t.step === -1) return roll === 6;
+    return t.step + roll <= 56;
+  });
+}
+
+canvas.addEventListener('click', (e) => {
+  if (!hasRolled) return;
+  const rect = canvas.getBoundingClientRect();
+  const clickX = (e.clientX - rect.left) * (canvas.width / rect.width);
+  const clickY = (e.clientY - rect.top) * (canvas.height / rect.height);
+
+  const movable = getMovableTokens(currentTurn, diceValue);
+  for (const token of movable) {
+    const pos = getTokenCanvasPos(token);
+    const dist = Math.hypot(clickX - pos.x, clickY - pos.y);
+    if (dist <= TILE_SIZE * 0.45) {
+      moveToken(token);
+      break;
+    }
+  }
+});
+
+function moveToken(token) {
+  if (token.step === -1) {
+    token.step = 0;
+    messageBox.textContent = `${PLAYERS[currentTurn].name} unlocked a token!`;
+  } else {
+    token.step += diceValue;
+    if (token.step === 56) {
+      messageBox.textContent = `${PLAYERS[currentTurn].name} scored a token home!`;
+    }
+  }
+
+  // Handle capture on main path
+  if (token.step >= 0 && token.step <= 50) {
+    const p = PLAYERS[token.playerId];
+    const currentGlobalTile = (p.startTile + token.step) % 52;
+
+    if (!SAFE_TILES.includes(currentGlobalTile)) {
+      tokens.forEach(other => {
+        if (other.playerId !== token.playerId && other.step >= 0 && other.step <= 50) {
+          const otherP = PLAYERS[other.playerId];
+          const otherGlobalTile = (otherP.startTile + other.step) % 52;
+          if (currentGlobalTile === otherGlobalTile) {
+            other.step = -1;
+            messageBox.textContent = `${PLAYERS[currentTurn].name} captured ${PLAYERS[other.playerId].name}'s token!`;
+          }
+        }
+      });
+    }
+  }
+
+  drawBoard();
+
+  if (checkWinner(currentTurn)) {
+    messageBox.textContent = `🎉 ${PLAYERS[currentTurn].name} WINS THE GAME! 🎉`;
+    rollBtn.disabled = true;
+    return;
+  }
+
+  if (diceValue === 6) {
+    messageBox.textContent = `${PLAYERS[currentTurn].name} rolled a 6! Roll again.`;
+    hasRolled = false;
+    rollBtn.disabled = false;
+  } else {
+    setTimeout(nextTurn, 800);
+  }
+}
+
+function checkWinner(playerId) {
+  return tokens.filter(t => t.playerId === playerId && t.step === 56).length === 4;
+}
+
+function nextTurn() {
+  currentTurn = (currentTurn + 1) % 4;
+  turnText.textContent = PLAYERS[currentTurn].name;
+  turnText.style.color = PLAYERS[currentTurn].color;
+  hasRolled = false;
+  rollBtn.disabled = false;
+  messageBox.textContent = `${PLAYERS[currentTurn].name}'s turn. Click "Roll Dice".`;
+}
+
+resetBtn.addEventListener('click', () => {
+  initTokens();
+  currentTurn = 0;
+  diceValue = 1;
+  hasRolled = false;
+  rollBtn.disabled = false;
+  diceDisplay.textContent = '1';
+  turnText.textContent = PLAYERS[0].name;
+  turnText.style.color = PLAYERS[0].color;
+  messageBox.textContent = 'Game reset. Click "Roll Dice" to start!';
+  drawBoard();
+});
+
+// Initial boot
+initTokens();
+turnText.style.color = PLAYERS[0].color;
 drawBoard();
 
-function trackIndex(color, progress) { return (START[color] + progress) % 52; }
-function positionFor(color, progress, index) {
-  if (progress < 0) return YARD[color][index];
-  if (progress >= 56) return [7.5,7.5];
-  if (progress >= 51) {
-    const [r,c] = HOME_LANE[color][progress-51];
-    return [c+.5, r+.5];
-  }
-  const [r,c] = UNIQUE_TRACK[trackIndex(color, progress)];
-  return [c+.5, r+.5];
-}
-function canMove(tokenProgress, dice) {
-  if (tokenProgress >= 56) return false;
-  if (tokenProgress < 0) return dice === 6;
-  return tokenProgress + dice <= 56;
-}
-
-function renderTokens() {
-  const g = boardEl.querySelector("#tokens");
-  if (!g || !state) return;
-  g.innerHTML = "";
-  const current = state.players[state.game?.turn ?? 0];
-  for (const p of state.players) {
-    p.tokens.forEach((progress, index) => {
-      const [x,y] = positionFor(p.color, progress, index);
-      const selectable = rolled && current?.id === selfId && rolled.legal.includes(index) && p.id === selfId;
-      const wrapper = svg("g", { transform:`translate(${x*60} ${y*60})`, class:`pawn ${selectable ? "selectable" : ""}` });
-      if (selectable) {
-        wrapper.style.cursor = "pointer";
-        wrapper.addEventListener("click", () => choosePawn(index));
-      }
-      wrapper.appendChild(svg("circle", { cx:0, cy:0, r:24, fill:COLOR_HEX[p.color], stroke:"#fff", "stroke-width":4, "paint-order":"stroke" }));
-      wrapper.appendChild(svg("circle", { cx:-7, cy:-9, r:7, fill:"#fff", opacity:.35 }));
-      wrapper.appendChild(svg("text", { x:0, y:6, "text-anchor":"middle", "font-size":15, "font-weight":900, fill:p.color === "yellow" ? "#222" : "#fff" })).textContent = String(index+1);
-      g.appendChild(wrapper);
-    });
-  }
-}
-
-function render() {
-  if (!state) return;
-  const current = state.players[state.game?.turn ?? 0];
-  roomCodeEl.textContent = `ROOM ${state.roomId}`;
-  turnBadge.textContent = state.game?.winner ? "GAME OVER" : current ? `${current.color.toUpperCase()}'S TURN` : "WAITING";
-  playersEl.innerHTML = state.players.map(p => `
-    <div class="player ${current?.id === p.id ? "active" : ""}">
-      <span class="dot ${p.color}"></span><span class="player-name">${esc(p.name)}</span>
-      ${p.id === selfId ? '<span class="you">YOU</span>' : ''}
-      <span class="score">${p.tokens.filter(t => t >= 56).length}/4</span>
-    </div>`).join("");
-
-  startBtn.hidden = state.started;
-  startBtn.disabled = state.players.length < 2;
-  rollBtn.disabled = !state.started || !!state.game?.winner || !current || current.id !== selfId || !!rolled;
-
-  if (state.game?.winner) statusEl.textContent = `${state.players.find(p=>p.id===state.game.winner)?.name || "Player"} wins! 🎉`;
-  else if (!state.started) statusEl.textContent = state.players.length < 2 ? "Waiting for another player…" : "Everyone's here — start the game!";
-  else if (current?.id === selfId) statusEl.textContent = rolled ? "Pick a glowing pawn to move." : "Your turn — roll the dice!";
-  else statusEl.textContent = `Waiting for ${current?.name || "the other player"}…`;
-
-  renderTokens();
-}
-
-function showDie(n) {
-  dieBtn.querySelector("span").textContent = DIE[n] || "—";
-}
-function animateDice(final) {
-  clearInterval(diceTimer);
-  dieBtn.classList.add("rolling");
-  let ticks = 0;
-  diceTimer = setInterval(() => {
-    showDie(1 + Math.floor(Math.random()*6));
-    ticks++;
-    if (ticks >= 12) {
-      clearInterval(diceTimer);
-      dieBtn.classList.remove("rolling");
-      showDie(final);
-    }
-  }, 65);
-}
-function choosePawn(index) {
-  if (!rolled || !rolled.legal.includes(index)) return;
-  send({ type:"move", token:index });
-  rolled = null;
-  render();
-}
-
-rollBtn.addEventListener("click", () => send({ type:"roll" }));
-dieBtn.addEventListener("click", () => { if (!rollBtn.disabled) send({ type:"roll" }); });
-startBtn.addEventListener("click", () => send({ type:"start" }));
-$("create").addEventListener("click", () => {
-  const name = $("name").value.trim() || "Player";
-  send({ type:"create", name });
-});
-$("join").addEventListener("click", () => {
-  const name = $("name").value.trim() || "Player";
-  const roomId = $("joinCode").value.trim().toUpperCase();
-  if (roomId.length !== 5) { modalError.textContent = "Enter the 5-letter room code."; return; }
-  send({ type:"join", roomId, name });
-});
-
-socket.addEventListener("open", () => { statusEl.textContent = "Connected — create or join a room."; });
-socket.addEventListener("message", event => {
-  const m = JSON.parse(event.data);
-  if (m.type === "error") { modalError.textContent = m.message; return; }
-  if (m.type === "joined") {
-    selfId = m.selfId;
-    state = m.state;
-    modal.classList.add("hidden");
-    render();
-    return;
-  }
-  if (m.type === "rollResult") {
-    rolled = { legal:m.legal };
-    animateDice(m.dice);
-    render();
-    return;
-  }
-  if (m.type === "state") {
-    state = m.state;
-    if (!state.game?.dice) rolled = null;
-    render();
-  }
-});
-socket.addEventListener("close", () => { statusEl.textContent = "Connection lost — refresh the page to reconnect."; });
