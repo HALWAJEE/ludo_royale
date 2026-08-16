@@ -1,7 +1,16 @@
 {
-  "name":"ludo-royale",
-  "version":"3.0.0",
-  "private":true,
-  "scripts":{"start":"node server.js"},
-  "dependencies":{"express":"^4.21.2","ws":"^8.18.0"}
+  "name": "ludo-game",
+  "version": "1.0.0",
+  "description": "Interactive Pass-and-Play Ludo Web Game",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
 }
+
