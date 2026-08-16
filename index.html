@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Ludo Royale</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="page">
+  <header class="topbar">
+    <div>
+      <div id="roomCode" class="eyebrow">ROOM -----</div>
+      <h1>Ludo <span>Royale</span></h1>
+    </div>
+    <div id="turnBadge" class="turn-badge">WAITING</div>
+  </header>
+
+  <section class="board-card">
+    <div id="board" class="board" aria-label="Ludo board"></div>
+  </section>
+
+  <section id="players" class="players"></section>
+
+  <section class="game-panel">
+    <div class="dice-title">DICE</div>
+    <button id="dice" class="die" aria-label="Dice"><span>⚀</span></button>
+    <div id="status" class="status">Create a room to begin.</div>
+    <button id="roll" class="primary" disabled>ROLL DICE</button>
+    <button id="start" class="secondary" disabled>START GAME</button>
+  </section>
+</div>
+
+<div id="modal" class="modal">
+  <div class="modal-card">
+    <div class="brand-die">🎲</div>
+    <h2>Ludo Royale</h2>
+    <p>Make a room, send the code to your friends, and play from anywhere.</p>
+    <input id="name" maxlength="16" placeholder="Your name" autocomplete="nickname">
+    <button id="create" class="primary">CREATE ROOM</button>
+    <div class="divider"><span>OR</span></div>
+    <input id="joinCode" maxlength="5" placeholder="5-letter room code" style="text-transform:uppercase">
+    <button id="join" class="secondary">JOIN ROOM</button>
+    <div id="modalError" class="error"></div>
+  </div>
+</div>
+<script src="app.js"></script>
+</body>
+</html>
