@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Ludo Royale</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=Playfair+Display:wght@700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app">
+  <section id="lobby" class="screen">
+    <div class="brand">LUDO ROYALE</div>
+    <h1>Play Ludo<br>with friends.</h1>
+    <p class="sub">Create a room and share the code. No same Wi‑Fi needed.</p>
+    <div class="card lobby-card">
+      <label>Your name<input id="nameInput" maxlength="16" value="Surya" autocomplete="off"></label>
+      <button id="createBtn" class="primary">CREATE ROOM</button>
+      <div class="or"><span>or</span></div>
+      <label>Room code<input id="roomInput" maxlength="5" placeholder="ABCDE" autocomplete="off" autocapitalize="characters"></label>
+      <button id="joinBtn" class="secondary">JOIN ROOM</button>
+      <div id="lobbyMsg" class="msg"></div>
+    </div>
+  </section>
+
+  <section id="game" class="screen hidden">
+    <header class="top">
+      <div>
+        <div class="room">ROOM <span id="roomCode">-----</span></div>
+        <h1>Ludo<br>Royale</h1>
+      </div>
+      <div id="turnBadge" class="turn-badge"><span class="dot"></span><span>WAITING</span></div>
+    </header>
+
+    <main>
+      <div class="board-wrap">
+        <div id="board" class="board" aria-label="Ludo board"></div>
+      </div>
+
+      <div id="playerList" class="players"></div>
+
+      <section class="dice-card card">
+        <div class="dice-label">DICE</div>
+        <div id="diceStage" class="dice-stage">
+          <div id="die" class="die face-1"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+        </div>
+        <button id="rollBtn" class="roll primary">ROLL DICE</button>
+        <div id="hint" class="hint">Roll a 6 to bring a pawn out.</div>
+      </section>
+
+      <div id="startPanel" class="card start-panel hidden">
+        <strong>Room ready</strong>
+        <span>Share the room code with your friend.</span>
+        <button id="startBtn" class="primary">START GAME</button>
+      </div>
+      <button id="copyBtn" class="copy secondary">COPY ROOM CODE</button>
+      <div id="gameMsg" class="msg"></div>
+    </main>
+  </section>
+</div>
+<script src="app.js"></script>
+</body>
+</html>
