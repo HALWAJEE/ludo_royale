@@ -1,0 +1,14 @@
+{
+  "name": "ludo-royale",
+  "version": "9.0.0",
+  "private": true,
+  "description": "Ludo Royale stable visual and animation polish",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.21.2",
+    "ws": "^8.18.0"
+  }
+}
