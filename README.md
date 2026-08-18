@@ -1,4 +1,4 @@
-# Ludo Royale v6.0.0
+# Doctor Dhoom's Ludo Royale v6.0.0
 
 A polished multiplayer Ludo web game built with Node.js, Express and WebSocket.
 
